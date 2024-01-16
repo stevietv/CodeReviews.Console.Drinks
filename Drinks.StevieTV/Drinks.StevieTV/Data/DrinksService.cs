@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Web;
 using DrinksInfo.StevieTV.Models;
@@ -7,7 +8,7 @@ using RestSharp;
 
 namespace DrinksInfo.StevieTV.Data;
 
-internal class DrinksService
+internal static class DrinksService
 {
     public static List<Category> GetCategories()
     {
@@ -16,7 +17,7 @@ internal class DrinksService
         var response = client.ExecuteAsync(request);
 
         if (response.Result.StatusCode != HttpStatusCode.OK) return new List<Category>();
-        
+
         var rawResponse = response.Result.Content;
         var serialize = JsonConvert.DeserializeObject<Categories>(rawResponse);
 
@@ -30,7 +31,7 @@ internal class DrinksService
         var response = client.ExecuteAsync(request);
 
         if (response.Result.StatusCode != HttpStatusCode.OK) return new List<Drink>();
-        
+
         var rawResponse = response.Result.Content;
         var serialize = JsonConvert.DeserializeObject<Drinks>(rawResponse);
 
@@ -44,7 +45,7 @@ internal class DrinksService
         var response = client.ExecuteAsync(request);
 
         if (response.Result.StatusCode != HttpStatusCode.OK) return new List<DrinkFormatted>();
-        
+
         var rawResponse = response.Result.Content;
         var serialize = JsonConvert.DeserializeObject<DrinkDetailObject>(rawResponse);
 
@@ -69,17 +70,19 @@ internal class DrinksService
                 {
                     var ingredientNumber = Regex.Match(formattedName, @"\d+").Value;
 
-                    try
+                    var measure = drinkDetail.GetType().GetProperty($"strMeasure{ingredientNumber}")?.GetValue(drinkDetail) != null
+                        ? drinkDetail.GetType().GetProperty($"strMeasure{ingredientNumber}")?.GetValue(drinkDetail)?.ToString()?.Trim()
+                        : "";
+                    
+                    if (!string.IsNullOrWhiteSpace(measure))
                     {
-                        var measure = drinkDetail.GetType().GetProperty($"strMeasure{ingredientNumber}").GetValue(drinkDetail).ToString().Trim();
-
                         formattedDrink.Add(new DrinkFormatted
                         {
                             Key = formattedName,
                             Value = $"{measure} {prop.GetValue(drinkDetail)}"
                         });
                     }
-                    catch (NullReferenceException)
+                    else
                     {
                         formattedDrink.Add(new DrinkFormatted
                         {
@@ -90,7 +93,6 @@ internal class DrinksService
                 }
                 else if (!formattedName.StartsWith("Measure") && !formattedName.StartsWith("DrinkThumb"))
                 {
-
                     formattedDrink.Add(new DrinkFormatted
                     {
                         Key = !string.IsNullOrWhiteSpace(formattedName) ? formattedName : prop.Name,
@@ -99,7 +101,7 @@ internal class DrinksService
                 }
             }
         }
-        
+
         return formattedDrink;
     }
 }
